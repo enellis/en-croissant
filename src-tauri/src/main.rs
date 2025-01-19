@@ -9,6 +9,7 @@ mod error;
 mod fide;
 mod fs;
 mod lexer;
+mod lichess_cloud;
 mod oauth;
 mod opening;
 mod pgn;

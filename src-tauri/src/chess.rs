@@ -25,6 +25,7 @@ use vampirc_uci::{
 use crate::{
     db::{is_position_in_db, GameQueryJs, PositionQueryJs},
     error::Error,
+    lichess_cloud::get_cloud_best_moves,
     AppState,
 };
 
@@ -228,16 +229,16 @@ pub struct AnalysisCacheKey {
 #[derive(Clone, Serialize, Debug, Derivative, Type)]
 #[derivative(Default)]
 pub struct BestMoves {
-    nodes: u32,
-    depth: u32,
-    score: Score,
+    pub nodes: u32,
+    pub depth: u32,
+    pub score: Score,
     #[serde(rename = "uciMoves")]
-    uci_moves: Vec<String>,
+    pub uci_moves: Vec<String>,
     #[serde(rename = "sanMoves")]
-    san_moves: Vec<String>,
+    pub san_moves: Vec<String>,
     #[derivative(Default(value = "1"))]
-    multipv: u16,
-    nps: u32,
+    pub multipv: u16,
+    pub nps: u32,
 }
 
 #[derive(Serialize, Debug, Clone, Type, Event)]
@@ -467,6 +468,25 @@ pub async fn get_best_moves(
 
     let key = (tab.clone(), engine.clone());
 
+    let multipv = options
+        .extra_options
+        .iter()
+        .find(|x| x.name == "MultiPV")
+        .map(|x| x.value.parse().ok())
+        .flatten()
+        .unwrap_or(1);
+
+    if let Ok(best_moves) = get_cloud_best_moves(&options.fen, &options.moves, multipv).await {
+        if state.engine_processes.contains_key(&key) {
+            {
+                let process = state.engine_processes.get_mut(&key).unwrap();
+                let mut process = process.lock().await;
+                process.stop().await?;
+            }
+        }
+        return Ok(Some((100., best_moves)));
+    }
+
     if state.engine_processes.contains_key(&key) {
         {
             let process = state.engine_processes.get_mut(&key).unwrap();
@@ -645,6 +665,13 @@ pub async fn analyze_game(
             finished: false,
         }
         .emit(&app)?;
+
+        if let Ok(cloud_moves) = get_cloud_best_moves(&options.fen, &moves, 2).await {
+            let mut cloud_analysis = MoveAnalysis::default();
+            cloud_analysis.best = cloud_moves;
+            analysis.push(cloud_analysis);
+            continue;
+        }
 
         let mut extra_options = uci_options.clone();
         if !extra_options.iter().any(|x| x.name == "MultiPV") {

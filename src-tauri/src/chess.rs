@@ -252,6 +252,16 @@ pub struct BestMovesPayload {
     pub progress: f64,
 }
 
+#[derive(Serialize, Debug, Clone, Type, Event)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalyzedGameMovePayload {
+    pub best_lines: Vec<BestMoves>,
+    pub engine: String,
+    pub tab: String,
+    pub fen: String,
+    pub moves: Vec<String>,
+}
+
 fn invert_score(score: Score) -> Score {
     let new_value = match score.value {
         ScoreValue::Cp(x) => ScoreValue::Cp(-x),
@@ -666,14 +676,8 @@ pub async fn analyze_game(
         }
         .emit(&app)?;
 
-        if let Ok(cloud_moves) = get_cloud_best_moves(&options.fen, &moves, 2).await {
-            let mut cloud_analysis = MoveAnalysis::default();
-            cloud_analysis.best = cloud_moves;
-            analysis.push(cloud_analysis);
-            continue;
-        }
-
         let mut extra_options = uci_options.clone();
+        let mut multipv = 2;
         if !extra_options.iter().any(|x| x.name == "MultiPV") {
             extra_options.push(EngineOption {
                 name: "MultiPV".to_string(),
@@ -682,9 +686,27 @@ pub async fn analyze_game(
         } else {
             extra_options.iter_mut().for_each(|x| {
                 if x.name == "MultiPV" {
-                    x.value = "2".to_string();
+                    x.value = std::cmp::max(String::from("2"), x.value.clone());
+                    multipv = x.value.parse().unwrap()
                 }
             });
+        }
+
+        if let Ok(cloud_moves) = get_cloud_best_moves(&options.fen, &moves, multipv).await {
+            let mut cloud_analysis = MoveAnalysis::default();
+            cloud_analysis.best = cloud_moves.clone();
+            analysis.push(cloud_analysis);
+
+            AnalyzedGameMovePayload {
+                best_lines: cloud_moves,
+                engine: engine.clone(),
+                fen: options.fen.clone(),
+                moves: moves.clone(),
+                tab: id.clone(),
+            }
+            .emit(&app)?;
+
+            continue;
         }
 
         proc.set_options(EngineOptions {
@@ -726,6 +748,15 @@ pub async fn analyze_game(
                 _ => {}
             }
         }
+
+        AnalyzedGameMovePayload {
+            best_lines: current_analysis.best.clone(),
+            engine: engine.clone(),
+            fen: options.fen.clone(),
+            moves: moves.clone(),
+            tab: id.clone(),
+        }
+        .emit(&app)?;
         analysis.push(current_analysis);
     }
 

@@ -356,11 +356,13 @@ async getPuzzleDbInfo(file: string) : Promise<Result<PuzzleDatabaseInfo, string>
 
 
 export const events = __makeEvents__<{
+analyzedGameMovePayload: AnalyzedGameMovePayload,
 bestMovesPayload: BestMovesPayload,
 databaseProgress: DatabaseProgress,
 downloadProgress: DownloadProgress,
 reportProgress: ReportProgress
 }>({
+analyzedGameMovePayload: "analyzed-game-move-payload",
 bestMovesPayload: "best-moves-payload",
 databaseProgress: "database-progress",
 downloadProgress: "download-progress",
@@ -374,6 +376,7 @@ reportProgress: "report-progress"
 /** user-defined types **/
 
 export type AnalysisOptions = { fen: string; moves: string[]; annotateNovelties: boolean; referenceDb: string | null; reversed: boolean }
+export type AnalyzedGameMovePayload = { bestLines: BestMoves[]; engine: string; tab: string; fen: string; moves: string[] }
 export type BestMoves = { nodes: number; depth: number; score: Score; uciMoves: string[]; sanMoves: string[]; multipv: number; nps: number }
 export type BestMovesPayload = { bestLines: BestMoves[]; engine: string; tab: string; fen: string; moves: string[]; progress: number }
 export type DatabaseInfo = { title: string; description: string; player_count: number; event_count: number; game_count: number; storage_size: number; filename: string; indexed: boolean }

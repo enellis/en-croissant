@@ -27,6 +27,7 @@ import { match } from "ts-pattern";
 import { useStore } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { TreeStateContext } from "../common/TreeStateContext";
+import { info } from "@tauri-apps/plugin-log";
 
 function EvalListener() {
   const [engines] = useAtom(enginesAtom);
@@ -167,6 +168,28 @@ function EngineListener({
     engine.name,
     setEngineVariation,
   ]);
+
+  useEffect(() => {
+    const unlisten = events.analyzedGameMovePayload.listen(({ payload }) => {
+      if (
+        engine.type === "local" &&
+        payload.engine == engine.path &&
+        payload.tab === `report_${activeTab}`
+      ) {
+        setEngineVariation((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(
+            `${payload.fen}:${payload.moves.join(",")}`,
+            payload.bestLines,
+          );
+          return newMap;
+        });
+      }
+    });
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, [activeTab, engine.name]);
 
   const getBestMoves = useMemo(
     () =>

@@ -19,7 +19,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::{fs::create_dir_all, path::Path};
 
-use chess::{BestMovesPayload, EngineProcess, ReportProgress};
+use chess::{AnalyzedGameMovePayload, BestMovesPayload, EngineProcess, ReportProgress};
 use dashmap::DashMap;
 use db::{DatabaseProgress, GameQueryJs, NormalizedGame, PositionStats};
 use derivative::Derivative;
@@ -160,6 +160,7 @@ fn main() {
         ))
         .events(tauri_specta::collect_events!(
             BestMovesPayload,
+            AnalyzedGameMovePayload,
             DatabaseProgress,
             DownloadProgress,
             ReportProgress

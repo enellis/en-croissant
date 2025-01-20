@@ -214,6 +214,7 @@ function EngineListener({
                 return newMap;
               });
               setProgress(progress);
+              setScore(bestMoves[0].score);
             }
           });
         }
